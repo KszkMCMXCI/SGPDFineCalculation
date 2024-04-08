@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SGPD 罰金計算</title>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+
+  <!-- jQuery library -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+  <style>
+    @import url(https://fonts.googleapis.com/css?family=Noto+Sans);
+
+    body {
+      color: #435757;
+      /* background: radial-gradient(#fff, #c3c5d9); */
+      background: #c3c5d9;
+      font: 1em "Noto Sans", sans-serif;
+    }
+
+    .row {
+      --bs-gutter-x: 1.0rem;
+    }
+
+    label.chb_label {
+      display: block;
+      position: relative;
+      margin: 10px 0 0 0;
+      padding: 5px 0 5px 0;
+      text-align: center;
+      border: 3px solid #fff;
+      border-radius: 100px;
+      color: #fff;
+      font-weight: normal;
+      background-color: #6a8494;
+      box-shadow: 0 0 20px rgba(0, 0, 0, .2);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color .2s, box-shadow .2s;
+    }
+
+    label.chb_label:hover,
+    input[type="checkbox"]:focus~label.chb_label {
+      box-shadow: 0 0 20px rgba(0, 0, 0, .6);
+    }
+
+    .btn_light {
+      position: relative;
+      margin: 10px 0 0 0;
+      padding: 5px 0 5px 0;
+      text-align: center;
+      border: 3px solid #f8f9fa;
+      border-radius: 100px;
+      color: #000;
+      background-color: #f8f9fa;
+      box-shadow: 0 0 20px rgba(0, 0, 0, .2);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      transition: background-color .2s, box-shadow .2s;
+    }
+
+    .btn_light:active {
+      box-shadow: 0 0 20px rgba(0, 0, 0, .6);
+      background-color: #d3d4d5;
+      border-color: #c6c7c8;
+    }
+
+    input[type="checkbox"]:checked~label.chb_label {
+      background-color: #ab576c;
+      font-weight: bold;
+    }
+
+    #div_title {
+      font: 2em "Noto Sans", sans-serif;
+    }
+
+    #div_crimes {
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+
+    #txt_amount {
+      background-color: transparent;
+      font-weight: bold;
+      font-size: 2em;
+      border: none;
+      outline: none;
+      text-align: right;
+      max-width: 60vw;
+    }
+
+    #txt_amount:focus {
+      border-bottom-style: solid;
+      border-bottom-width: 1px;
+      border-bottom-color: #6a8494;
+    }
+
+    #div_amount span {
+      font-size: 1.5em;
+      color: #435757;
+      font-weight: normal;
+    }
+
+    .display_none {
+      display: none !important;
+    }
+
+    .tac {
+      text-align: center;
+    }
+
+    .w100 {
+      width: 100%;
+    }
+
+    .w90 {
+      width: 90%;
+    }
+
+    .w25 {
+      width: 25%;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="div_title" class="tac">
+    SGPD 罰金計算
+  </div>
+  <div id="div_amount" class="tac">
+    <span>合計:</span>
+    <input id="txt_amount" readonly="true"></input>
+    <span>円</span>
+  </div>
+  <div class="tac">
+    <button id="btn_reset_fines" class="btn_light w90">リセット</button>
+  </div>
+  <div id="div_fines" class="w100 row"></div>
+  <div id="div_crimes"></div>
+
+  <script>
+    //罰金一覧
+    var fines_list;
+    //罪状一括選択ボタン一覧
+    var crimes_list;
+
+    $(document).ready(function () {
+
+      // ./sgpd.jonを読み込む
+      $.getJSON("./sgpd.json", function (data) {
+        //finesとcrimesの値を変数fines_list,crimes_listに保存する
+        fines_list = data.fines;
+        crimes_list = data.crimes;
+
+        //finesの各値のfineオブジェクトに基づいてチェックボックスを作成する 
+        $(fines_list).each(function () {
+          checkbox = $("<input type='checkbox'>").attr({id: "chb" + this.id, value: this.amount}).addClass("fine display_none");
+          $("#div_fines").append(
+            $('<div>').addClass("col-3")
+              .append(checkbox)
+              .append($('<label>').attr('for', checkbox.attr("id")).text(this.name).addClass("chb_label d-none d-md-block"))
+              .append($('<label>').attr('for', checkbox.attr("id")).text(this.short).addClass("chb_label d-block d-md-none"))
+          );
+        });
+
+        //罪状チェックボックス変更時のイベントの設定する 
+        $("input[type=checkbox].fine").on("change", change_fine);
+
+        //crimesのプロパティ毎に値に基づいて罪状一括選択ボタンを作成する 
+        Object.keys(crimes_list).forEach(element => {
+          if (crimes_list[element] && crimes_list[element].length > 0) {
+            div_cateGory = $('<div>').addClass("w100 row");
+            $(crimes_list[element]).each(function () {
+              if (this.fines && this.fines.length > 0) {
+                div_cateGory.append(
+                  $('<div>').addClass("col-3")
+                    .append($("<input type='button'>").attr({"category": element, "crime": this.id}).val(this.name).addClass("btn_light crime w100 d-none d-md-block"))
+                    .append($("<input type='button'>").attr({"category": element, "crime": this.id}).val(this.short).addClass("btn_light crime w100 d-block d-md-none"))
+                );
+              }
+            });
+            $("#div_crimes").append(div_cateGory);
+          }
+        });
+
+        //罪状一括選択ボタンクリック時のイベントの設定する 
+        $("input[type=button].crime").on("click", function () {
+          set_fines($(this).attr("category"), $(this).attr("crime"))
+        });
+      });
+
+      // 罰金額選択時、選択解除時のイベントを設定する
+      $("#txt_amount").focus(function (e) {$(this).val($(this).val().replace(/[^0-9]/g, '')); $(this).select();});
+      $("#txt_amount").blur(function (e) {$(this).val($(this).val().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,"));});
+      
+      //リセットボタンクリック時のイベントの設定する 
+      $('#btn_reset_fines').on("click", reset_fine);
+      reset_fine();
+    });
+
+    //罰金額を計算する
+    function change_fine() {
+      chbs = $(".fine:checked").get();
+      sum = chbs.reduce((sum, element) => sum + Number(element.value), 0) + "";
+      $("#txt_amount").val((sum).replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,"));
+      $("#txt_amount").css("color", sum < 3000000 ? "#435757" : "#ab576c");
+      console.log(chbs.reduce((ids, element) => ids + element.id + ", ", "")); 
+    }
+
+    //罪状選択を初期化する
+    function reset_fine() {
+      $("input[type=checkbox].fine").prop('checked', false);
+      change_fine();
+    }
+
+    //罪状を一括選択する
+    function set_fines(category, crime_id) {
+      $("input[type=checkbox].fine").prop('checked', false);
+      crime = $.grep(crimes_list[category], function (element, index) {return (element.id == crime_id && element.fines && element.fines.length > 0);})[0]
+      $(crime.fines).each(function (i, id) {
+        $("#chb" + id).prop('checked', true);
+      });
+      change_fine();
+    }
+  </script>
+</body>
+
+</html>
